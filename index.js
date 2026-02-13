@@ -42,3 +42,55 @@ async function startWatcher() {
         // Format items
         const itemList = order.items
           .map((item, index) => {
+            const subtotal = item.price * item.quantity;
+            return `${index + 1}. ${item.name}
+   Qty: ${item.quantity}
+   Price: ₹${item.price}
+   Subtotal: ₹${subtotal}`;
+          })
+          .join("\n\n");
+
+        // WhatsApp message
+        const message = `🛒 *NEW ORDER RECEIVED*
+
+🆔 Order ID:
+${order._id}
+
+👤 User ID:
+${order.userId}
+
+🛍 Items:
+${itemList}
+
+💰 *Total Amount:* ₹${order.total}
+`;
+
+        // Send WhatsApp (must be inside 24h sandbox session)
+        await twilioClient.messages.create({
+          from: "whatsapp:+14155238886", // Twilio sandbox number
+          to: process.env.ADMIN_WHATSAPP_NUMBER, // Must include whatsapp:+
+          body: message,
+        });
+
+        console.log("📲 WhatsApp notification sent!");
+      } catch (err) {
+        console.error("Twilio send error:", err);
+      }
+    });
+
+    // Keep process alive (important for Railway)
+    process.stdin.resume();
+
+    // Graceful shutdown
+    process.on("SIGTERM", async () => {
+      console.log("Shutting down gracefully...");
+      await mongoClient.close();
+      process.exit(0);
+    });
+
+  } catch (err) {
+    console.error("Watcher startup error:", err);
+  }
+}
+
+startWatcher();
