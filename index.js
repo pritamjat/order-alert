@@ -4,51 +4,59 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const mongoClient = new MongoClient(process.env.MONGO_URI);
+const client = new MongoClient(process.env.MONGO_URI);
 const twilioClient = twilio(
   process.env.TWILIO_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
 
-async function watchOrders() {
-  await mongoClient.connect();
-  console.log("✅ Connected to MongoDB");
+async function startWatcher() {
+  try {
+    await client.connect();
+    console.log("✅ Connected to MongoDB");
 
-  const db = mongoClient.db();
-  const orders = db.collection("orders");
+    const db = client.db("test"); // explicitly set DB
+    console.log("Using database:", db.databaseName);
 
-  const changeStream = orders.watch([
-    { $match: { operationType: "insert" } }
-  ]);
+    const orders = db.collection("orders");
 
-  console.log("👀 Watching for new orders...");
+    const changeStream = orders.watch(
+      [{ $match: { operationType: "insert" } }],
+      { fullDocument: "updateLookup" }
+    );
 
-  changeStream.on("change", async (change) => {
-    const order = change.fullDocument;
+    console.log("👀 Watching for new orders...");
 
-    const itemList = order.items
-      .map((item) => `${item.name} x${item.quantity}`)
-      .join("\n");
+    changeStream.on("change", async (change) => {
+      console.log("🔥 Change detected");
 
-    const message = `🛒 New Order!
+      const order = change.fullDocument;
+
+      const itemList = order.items
+        .map((item) => `${item.name} x${item.quantity}`)
+        .join("\n");
+
+      await twilioClient.messages.create({
+        from: process.env.TWILIO_WHATSAPP_NUMBER,
+        to: process.env.ADMIN_WHATSAPP_NUMBER,
+        body: `🛒 New Order!
 
 Order ID: ${order._id}
+Total: ₹${order.total}
 
 Items:
-${itemList}
+${itemList}`
+      });
 
-Total: ₹${order.total}
-`;
-
-    await twilioClient.messages.create({
-      from: process.env.TWILIO_WHATSAPP_NUMBER,
-      to: process.env.ADMIN_WHATSAPP_NUMBER,
-      body: message
+      console.log("📲 WhatsApp notification sent!");
     });
 
-    console.log("📲 WhatsApp notification sent!");
-  });
+    // Prevent process from exiting
+    process.stdin.resume();
+
+  } catch (err) {
+    console.error("Watcher error:", err);
+  }
 }
 
-watchOrders().catch(console.error);
-
+startWatcher();
