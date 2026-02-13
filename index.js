@@ -33,31 +33,30 @@ async function startWatcher() {
 
     console.log("👀 Watching for new orders...");
 
-    changeStream.on("change", async (change) => {
-      try {
-        console.log("🔥 Change detected");
+ changeStream.on("change", async (change) => {
+  try {
+    console.log("🔥 Change detected");
 
-        const order = change.fullDocument;
+    const order = change.fullDocument;
 
-        // Format items
-        const itemList = order.items
-          .map((item, index) => {
-            const subtotal = item.price * item.quantity;
-            return `${index + 1}. ${item.name}
+    if (!order || !Array.isArray(order.items)) {
+      console.log("❌ No items found in order:", order);
+      return;
+    }
+
+    const itemList = order.items.map((item, index) => {
+      const subtotal = item.price * item.quantity;
+
+      return `${index + 1}. ${item.name}
    Qty: ${item.quantity}
    Price: ₹${item.price}
    Subtotal: ₹${subtotal}`;
-          })
-          .join("\n\n");
+    }).join("\n\n");
 
-        // WhatsApp message
-        const message = `🛒 *NEW ORDER RECEIVED*
+    const message = `🛒 *NEW ORDER RECEIVED*
 
 🆔 Order ID:
 ${order._id}
-
-👤 User ID:
-${order.userId}
 
 🛍 Items:
 ${itemList}
@@ -65,18 +64,19 @@ ${itemList}
 💰 *Total Amount:* ₹${order.total}
 `;
 
-        // Send WhatsApp (must be inside 24h sandbox session)
-        await twilioClient.messages.create({
-          from: "whatsapp:+14155238886", // Twilio sandbox number
-          to: process.env.ADMIN_WHATSAPP_NUMBER, // Must include whatsapp:+
-          body: message,
-        });
-
-        console.log("📲 WhatsApp notification sent!");
-      } catch (err) {
-        console.error("Twilio send error:", err);
-      }
+    await twilioClient.messages.create({
+      from: "whatsapp:+14155238886",
+      to: process.env.ADMIN_WHATSAPP_NUMBER,
+      body: message
     });
+
+    console.log("📲 WhatsApp notification sent!");
+
+  } catch (err) {
+    console.error("Twilio send error:", err);
+  }
+});
+
 
     // Keep process alive (important for Railway)
     process.stdin.resume();
