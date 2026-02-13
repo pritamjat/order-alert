@@ -1,1 +1,10 @@
+{
+  "cron": [
+    {
+      "path": "/api/check-orders",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}
+
 
