@@ -4,7 +4,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const client = new MongoClient(process.env.MONGO_URI);
+const mongoClient = new MongoClient(process.env.MONGO_URI);
+
 const twilioClient = twilio(
   process.env.TWILIO_SID,
   process.env.TWILIO_AUTH_TOKEN
@@ -12,10 +13,10 @@ const twilioClient = twilio(
 
 async function startWatcher() {
   try {
-    await client.connect();
+    await mongoClient.connect();
     console.log("✅ Connected to MongoDB");
 
-    const db = client.db("test"); // explicitly set DB
+    const db = mongoClient.db("test");
     console.log("Using database:", db.databaseName);
 
     const orders = db.collection("orders");
@@ -28,34 +29,36 @@ async function startWatcher() {
     console.log("👀 Watching for new orders...");
 
     changeStream.on("change", async (change) => {
-      console.log("🔥 Change detected");
+      try {
+        console.log("🔥 Change detected");
 
-      const order = change.fullDocument;
+        const order = change.fullDocument;
 
-      const itemList = order.items
-        .map((item) => `${item.name} x${item.quantity}`)
-        .join("\n");
+        // 🔥 IMPORTANT:
+        // Use the EXACT contentSid shown in your Twilio dashboard
+        const CONTENT_SID = "HXb5b62575e6e4ff6129ad7c8efe1f983e";
 
-      await twilioClient.messages.create({
-        from: process.env.TWILIO_WHATSAPP_NUMBER,
-        to: process.env.ADMIN_WHATSAPP_NUMBER,
-        body: `🛒 New Order!
+        await twilioClient.messages.create({
+          from: "whatsapp:+14155238886", // Twilio sandbox number
+          to: process.env.ADMIN_WHATSAPP_NUMBER,
+          contentSid: CONTENT_SID,
+          contentVariables: JSON.stringify({
+            1: `Order ${order._id}`,
+            2: `₹${order.total}`
+          })
+        });
 
-Order ID: ${order._id}
-Total: ₹${order.total}
-
-Items:
-${itemList}`
-      });
-
-      console.log("📲 WhatsApp notification sent!");
+        console.log("📲 WhatsApp notification sent!");
+      } catch (err) {
+        console.error("Twilio send error:", err);
+      }
     });
 
-    // Prevent process from exiting
+    // Keep process alive
     process.stdin.resume();
 
   } catch (err) {
-    console.error("Watcher error:", err);
+    console.error("Watcher startup error:", err);
   }
 }
 
