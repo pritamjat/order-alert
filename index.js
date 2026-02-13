@@ -58,6 +58,9 @@ async function startWatcher() {
 🆔 Order ID:
 ${order._id}
 
+👤 User ID:
+${order.userId}
+
 🛍 Items:
 ${itemList}
 
