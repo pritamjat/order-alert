@@ -66,7 +66,7 @@ changeStream.on("change", async (change) => {
       })
       .join("\n\n");
 
-    const message = `🛒 *PAID ORDER RECEIVED*
+    const message = `🛒 *NEW ORDER RECEIVED*
 
 🆔 Order ID:
 ${order._id}
