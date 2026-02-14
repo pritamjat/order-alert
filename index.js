@@ -27,39 +27,52 @@ async function startWatcher() {
 
     // Watch for new inserts only
     const changeStream = orders.watch(
-      [{ $match: { operationType: "insert" } }],
-      { fullDocument: "updateLookup" }
-    );
+  [
+    {
+      $match: {
+        operationType: "update"
+      }
+    }
+  ],
+  { fullDocument: "updateLookup" }
+);
 
-    console.log("👀 Watching for new orders...");
+console.log("👀 Watching for paid orders...");
 
- changeStream.on("change", async (change) => {
+changeStream.on("change", async (change) => {
   try {
-    console.log("🔥 Change detected");
-
     const order = change.fullDocument;
 
-    if (!order || !Array.isArray(order.items)) {
-      console.log("❌ No items found in order:", order);
+    // Only proceed if status is paid
+    if (!order || order.status !== "paid") {
       return;
     }
 
-    const itemList = order.items.map((item, index) => {
-      const subtotal = item.price * item.quantity;
+    console.log("💰 Paid order detected:", order._id);
 
-      return `${index + 1}. ${item.name}
+    if (!Array.isArray(order.items)) {
+      console.log("❌ No items found in order");
+      return;
+    }
+
+    const itemList = order.items
+      .map((item, index) => {
+        const subtotal = item.price * item.quantity;
+
+        return `${index + 1}. ${item.name}
    Qty: ${item.quantity}
    Price: ₹${item.price}
    Subtotal: ₹${subtotal}`;
-    }).join("\n\n");
+      })
+      .join("\n\n");
 
-    const message = `🛒 *NEW ORDER RECEIVED*
+    const message = `🛒 *PAID ORDER RECEIVED*
 
 🆔 Order ID:
 ${order._id}
 
-👤 User ID:
-${order.userId}
+🏠 Address:
+${order.address"}
 
 🛍 Items:
 ${itemList}
@@ -79,6 +92,7 @@ ${itemList}
     console.error("Twilio send error:", err);
   }
 });
+
 
 
     // Keep process alive (important for Railway)
