@@ -26,7 +26,7 @@ async function startWatcher() {
     const orders = db.collection("orders");
 
     // Watch for new inserts only
-    const changeStream = orders.watch(
+   const changeStream = orders.watch(
   [
     {
       $match: {
@@ -43,18 +43,27 @@ changeStream.on("change", async (change) => {
   try {
     const order = change.fullDocument;
 
-    // Only proceed if status is paid
+    // Only send when status becomes paid
     if (!order || order.status !== "paid") {
       return;
     }
 
     console.log("💰 Paid order detected:", order._id);
 
-    if (!Array.isArray(order.items)) {
-      console.log("❌ No items found in order");
-      return;
+    // Format address properly
+    let formattedAddress = "Not Provided";
+
+    if (order.address) {
+      const a = order.address;
+
+      formattedAddress = `${a.fullName || ""}
+${a.phone || ""}
+${a.line1 || ""}
+${a.city || ""}, ${a.state || ""}
+PIN: ${a.pincode || ""}`;
     }
 
+    // Format items
     const itemList = order.items
       .map((item, index) => {
         const subtotal = item.price * item.quantity;
@@ -66,13 +75,18 @@ changeStream.on("change", async (change) => {
       })
       .join("\n\n");
 
-    const message = `🛒 *NEW ORDER RECEIVED*
+    const message = `🛒 *PAID ORDER RECEIVED*
 
 🆔 Order ID:
 ${order._id}
 
+👤 Customer:
+${order.address?.fullName || "N/A"}
+📞 Phone:
+${order.address?.phone || "N/A"}
+
 🏠 Address:
-${order.address}
+${formattedAddress}
 
 🛍 Items:
 ${itemList}
@@ -92,6 +106,7 @@ ${itemList}
     console.error("Twilio send error:", err);
   }
 });
+
 
 
 
