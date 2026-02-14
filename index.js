@@ -72,7 +72,7 @@ changeStream.on("change", async (change) => {
 ${order._id}
 
 🏠 Address:
-${order.address"}
+${order.address}
 
 🛍 Items:
 ${itemList}
